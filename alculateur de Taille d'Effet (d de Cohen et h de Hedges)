@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de Taille d'Effet (d de Cohen / g de Hedges)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Custom styles for better UX */
+        .input-group {
+            transition: all 0.3s ease-in-out;
+        }
+        .result-card {
+            transition: all 0.5s ease-in-out;
+            transform: translateY(20px);
+            opacity: 0;
+            visibility: hidden;
+        }
+        .result-card.visible {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+        .d3-axis path,
+        .d3-axis line {
+            stroke: #9ca3af; /* gray-400 */
+        }
+        .d3-axis text {
+            fill: #6b7280; /* gray-500 */
+            font-size: 12px;
+        }
+        .details-marker::before {
+            content: '▶';
+            margin-right: 8px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        details[open] > summary .details-marker::before {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Calculateur de Taille d'Effet</h1>
+            <p class="mt-2 text-lg text-gray-600">Calculez, visualisez et comprenez le <strong>d de Cohen</strong> et le <strong>g de Hedges</strong>.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            
+            <!-- Input Form Section -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6 border-b pb-4 text-gray-800">Paramètres des groupes</h2>
+                
+                <!-- Error Message Display -->
+                <div id="error-message" class="hidden mb-4 p-3 text-sm text-red-800 bg-red-100 rounded-lg" role="alert">
+                </div>
+
+                <form id="effect-size-form" class="space-y-6">
+                    <!-- Group 1 -->
+                    <div class="input-group border border-gray-200 p-4 rounded-xl">
+                        <h3 class="text-lg font-medium text-blue-600 mb-3">Groupe 1</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="m1" class="block text-sm font-medium text-gray-700">Moyenne (M₁)</label>
+                                <input type="text" inputmode="decimal" id="m1" name="m1" value="100" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2" required>
+                            </div>
+                            <div>
+                                <label for="n1" class="block text-sm font-medium text-gray-700">Effectif (n₁)</label>
+                                <input type="number" id="n1" name="n1" value="30" step="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2" required>
+                            </div>
+                            <div>
+                                <label for="s1" class="block text-sm font-medium text-gray-700">Écart-type (s₁)</label>
+                                <input type="text" inputmode="decimal" id="s1" name="s1" value="15" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2" required>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Group 2 -->
+                    <div class="input-group border border-gray-200 p-4 rounded-xl">
+                         <h3 class="text-lg font-medium text-green-600 mb-3">Groupe 2</h3>
+                         <div class="space-y-4">
+                            <div>
+                                <label for="m2" class="block text-sm font-medium text-gray-700">Moyenne (M₂)</label>
+                                <input type="text" inputmode="decimal" id="m2" name="m2" value="107,5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2" required>
+                            </div>
+                            <div>
+                                <label for="n2" class="block text-sm font-medium text-gray-700">Effectif (n₂)</label>
+                                <input type="number" id="n2" name="n2" value="30" step="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2" required>
+                            </div>
+                             <div>
+                                <label for="s2" class="block text-sm font-medium text-gray-700">Écart-type (s₂)</label>
+                                <input type="text" inputmode="decimal" id="s2" name="s2" value="15" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2" required>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
+                        Calculer la Taille d'Effet
+                    </button>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results-section" class="lg:col-span-3 space-y-8">
+                <!-- Result Value Card -->
+                <div id="result-value-card" class="result-card bg-white p-6 rounded-2xl shadow-lg">
+                     <h2 class="text-2xl font-semibold text-gray-800 mb-4">Résultats</h2>
+                     <div id="result-display" class="text-center p-6 rounded-lg">
+                        <p id="result-label" class="text-lg font-medium text-gray-600">Taille d'effet</p>
+                        <p id="result-value" class="text-6xl font-bold">0,00</p>
+                        <p id="result-type" class="text-sm text-gray-500 mt-1"></p>
+                     </div>
+                     <div id="interpretation" class="mt-4"></div>
+                </div>
+
+                <!-- Graph Card -->
+                <div id="result-graph-card" class="result-card bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Visualisation des Distributions</h3>
+                    <div id="graph-container" class="w-full h-80"></div>
+                    <div class="text-center mt-4">
+                        <p class="text-lg font-medium text-gray-700">Chevauchement des distributions :</p>
+                        <p id="overlap-value" class="text-3xl font-bold text-indigo-600">0%</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Explanation Section -->
+        <section class="mt-12 bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+            <details>
+                <summary class="text-2xl font-semibold text-gray-800 cursor-pointer list-none">
+                    <span class="details-marker"></span>Comprendre la taille d'effet pas à pas
+                </summary>
+                <div class="mt-6 prose prose-lg max-w-none prose-indigo">
+                    <p>La taille d'effet est une mesure statistique essentielle qui quantifie la <strong>magnitude d'un phénomène</strong>. Contrairement au p-value, qui nous dit si un effet existe, la taille d'effet nous dit <strong>quelle est son importance</strong>. Un effet peut être statistiquement significatif, mais pratiquement insignifiant. C'est là que la taille d'effet intervient.</p>
+                    
+                    <h4 class="font-semibold">Étape 1 : La différence brute entre les moyennes</h4>
+                    <p>Tout commence par la différence la plus simple et intuitive entre nos deux groupes : la différence de leurs moyennes (M₁ et M₂).</p>
+                    <blockquote>Exemple : Si un groupe de plantes avec engrais (Groupe 1) mesure en moyenne 15 cm (M₁) et un groupe sans engrais (Groupe 2) mesure 10 cm (M₂), la différence brute est de 5 cm.</blockquote>
+                    <p>Cependant, une différence de 5 cm est-elle grande ou petite ? Cela dépend de la variabilité naturelle des plantes. C'est pourquoi nous devons standardiser cette différence.</p>
+
+                    <h4 class="font-semibold">Étape 2 : Standardiser la différence</h4>
+                    <p>Pour rendre la différence comparable quel que soit ce que l'on mesure (des cm, des points de QI, des millisecondes...), on la divise par un écart-type. Mais lequel utiliser, celui du groupe 1 (s₁) ou du groupe 2 (s₂) ? On utilise une version combinée et pondérée : l'<strong>écart-type groupé (ou "pooled")</strong>.</p>
+
+                    <h4 class="font-semibold">Étape 3 : Calcul de l'écart-type groupé (s<sub>p</sub>)</h4>
+                    <p>Cette mesure combine la variance (écart-type au carré) des deux groupes, en donnant plus de poids au groupe ayant le plus grand effectif. La formule est :</p>
+                    <p class="text-center bg-gray-100 p-4 rounded-md">
+                        $$ s_p = \sqrt{\frac{(n_1 - 1)s_1^2 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}} $$
+                    </p>
+                    <p>Où :</p>
+                    <ul>
+                        <li><strong><code>s_p</code></strong> : L'écart-type groupé (ou commun). C'est une estimation de l'écart-type que l'on suppose partagé par les deux groupes.</li>
+                        <li><strong><code>n₁</code></strong> et <strong><code>n₂</code></strong> : Les effectifs (nombre de sujets) des groupes 1 et 2.</li>
+                        <li><strong><code>s₁²</code></strong> et <strong><code>s₂²</code></strong> : Les variances (c'est-à-dire l'écart-type au carré) des groupes 1 et 2.</li>
+                    </ul>
+
+                    <h4 class="font-semibold">Étape 4 : Le <i>d</i> de Cohen</h4>
+                    <p>Une fois qu'on a notre écart-type standardisé, le calcul du <i>d</i> de Cohen devient très simple. C'est la différence des moyennes divisée par cet écart-type groupé.</p>
+                     <p class="text-center bg-gray-100 p-4 rounded-md">
+                        $$ d = \frac{M_1 - M_2}{s_p} $$
+                    </p>
+                    <p>Où :</p>
+                    <ul>
+                        <li><strong><code>d</code></strong> : La taille d'effet, ou d de Cohen.</li>
+                        <li><strong><code>M₁</code></strong> et <strong><code>M₂</code></strong> : Les moyennes respectives des groupes 1 et 2.</li>
+                        <li><strong><code>s_p</code></strong> : L'écart-type groupé, calculé juste avant.</li>
+                    </ul>
+
+                     <h4 class="font-semibold">Étape 5 : La correction pour petits échantillons (<i>g</i> de Hedges)</h4>
+                     <p>Le <i>d</i> de Cohen a tendance à légèrement surestimer la taille de l'effet lorsque les échantillons sont petits (typiquement, quand n₁ + n₂ < 50). Le <i>g</i> de Hedges applique une petite correction pour un résultat plus conservateur et précis.</p>
+                     <p class="text-center bg-gray-100 p-4 rounded-md">
+                        $$ g = d \times \left(1 - \frac{3}{4(n_1 + n_2 - 2) - 1}\right) $$
+                    </p>
+                     <p>Où :</p>
+                    <ul>
+                        <li><strong><code>g</code></strong> : La taille d'effet corrigée, ou g de Hedges.</li>
+                        <li><strong><code>d</code></strong> : La valeur du d de Cohen calculée à l'étape 4.</li>
+                        <li><strong><code>n₁</code></strong> et <strong><code>n₂</code></strong> : Les effectifs des deux groupes.</li>
+                    </ul>
+
+                    <h4 class="font-semibold">Étape 6 : Interpréter la valeur</h4>
+                    <p>Jacob Cohen a proposé des conventions pour interpréter la magnitude de l'effet, qui sont largement utilisées :</p>
+                    <ul>
+                        <li><strong>|d| ≈ 0,2</strong> : Effet <strong>petit</strong>. La différence est réelle mais difficile à percevoir.</li>
+                        <li><strong>|d| ≈ 0,5</strong> : Effet <strong>moyen</strong>. La différence est visible à l'œil nu.</li>
+                        <li><strong>|d| ≈ 0,8</strong> : Effet <strong>large</strong>. La différence est importante et évidente.</li>
+                    </ul>
+                    <p>Ces seuils sont des guides, pas des règles absolues. L'importance d'un effet dépend toujours du contexte de la recherche.</p>
+                    
+                    <h4 class="font-semibold">Étape 7 : Visualiser le chevauchement (Overlap)</h4>
+                    <p>Le graphique et le pourcentage de chevauchement vous donnent une idée très concrète de la taille de l'effet. Un faible chevauchement (associé à une grande taille d'effet) signifie que les deux groupes sont très distincts. Un grand chevauchement (associé à une petite taille d'effet) signifie que les individus des deux groupes sont très similaires malgré une différence de moyenne.</p>
+                </div>
+            </details>
+        </section>
+
+    </div>
+    
+    <!-- Footer Section -->
+    <footer class="mt-16 bg-white border-t border-gray-200">
+        <div class="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-sm text-gray-600">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="text-center md:text-left space-y-1">
+                    <p class="font-semibold">Dr FENOHASINA T. J. Felicien.</p>
+                    <p>Dernière mise à jour : 25 juin 2025.</p>
+                </div>
+                <div class="flex items-center justify-center md:justify-start gap-2">
+                    <img class="h-5 w-auto" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Cc-by-nc-sa_icon.svg/240px-Cc-by-nc-sa_icon.svg.png" alt="Icône Creative Commons BY-NC-SA">
+                    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr" target="_blank" rel="noopener noreferrer" class="underline hover:text-indigo-600">
+                        Licence CC BY-NC-SA 4.0
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MathJax for rendering formulas -->
+    <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- DOM Element Selection ---
+            const form = document.getElementById('effect-size-form');
+            const resultValueCard = document.getElementById('result-value-card');
+            const resultGraphCard = document.getElementById('result-graph-card');
+            const resultDisplay = document.getElementById('result-display');
+            const resultLabel = document.getElementById('result-label');
+            const resultValue = document.getElementById('result-value');
+            const interpretationDiv = document.getElementById('interpretation');
+            const overlapValue = document.getElementById('overlap-value');
+            const errorMessageDiv = document.getElementById('error-message');
+
+            // --- Event Listeners ---
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                calculateAndDisplay();
+            });
+
+            // Initial calculation on page load with default values
+            calculateAndDisplay();
+
+            // Redraw graph on window resize for responsiveness
+            window.addEventListener('resize', calculateAndDisplay);
+
+            // --- Core Calculation and Display Function ---
+            function calculateAndDisplay() {
+                // 1. Get and validate input values, replacing comma with dot for parsing
+                const m1_str = document.getElementById('m1').value;
+                const s1_str = document.getElementById('s1').value;
+                const m2_str = document.getElementById('m2').value;
+                const s2_str = document.getElementById('s2').value;
+
+                const m1 = parseFloat(m1_str.replace(',', '.'));
+                const n1 = parseInt(document.getElementById('n1').value, 10);
+                const s1 = parseFloat(s1_str.replace(',', '.'));
+                const m2 = parseFloat(m2_str.replace(',', '.'));
+                const n2 = parseInt(document.getElementById('n2').value, 10);
+                const s2 = parseFloat(s2_str.replace(',', '.'));
+
+                if ([m1, n1, s1, m2, n2, s2].some(isNaN) || n1 <= 1 || n2 <= 1 || s1 <= 0 || s2 <= 0) {
+                    errorMessageDiv.textContent = "Veuillez vérifier vos données. Les effectifs (n) doivent être > 1 et les écarts-types (s) doivent être > 0.";
+                    errorMessageDiv.classList.remove('hidden');
+                    resultValueCard.classList.remove('visible');
+                    resultGraphCard.classList.remove('visible');
+                    return;
+                }
+                
+                errorMessageDiv.classList.add('hidden');
+
+                const df = n1 + n2 - 2;
+                if (df <= 0) return;
+                
+                const term1 = (n1 - 1) * Math.pow(s1, 2);
+                const term2 = (n2 - 1) * Math.pow(s2, 2);
+                const s_p = Math.sqrt((term1 + term2) / df);
+                
+                if (s_p === 0) return; 
+
+                let cohen_d = (m1 - m2) / s_p;
+
+                const N = n1 + n2;
+                let effectSize = cohen_d;
+                let effectSizeType = "d de Cohen";
+
+                if (N < 50) {
+                    const correctionFactor = 1 - (3 / (4 * df - 1));
+                    effectSize = cohen_d * correctionFactor;
+                    effectSizeType = "g de Hedges (corrigé)";
+                }
+
+                const absEffectSize = Math.abs(effectSize);
+
+                updateResultsUI(effectSize, effectSizeType, absEffectSize);
+
+                const overlap = 2 * standardNormalCdf(-absEffectSize / 2);
+                overlapValue.textContent = `${(overlap * 100).toFixed(1).replace('.', ',')}%`;
+
+                drawGraph(m1, s1, m2, s2);
+
+                resultValueCard.classList.add('visible');
+                resultGraphCard.classList.add('visible');
+            }
+            
+            function updateResultsUI(effectSize, effectSizeType, absEffectSize) {
+                resultLabel.textContent = `Taille d'effet (${effectSizeType})`;
+                resultValue.textContent = effectSize.toFixed(3).replace('.', ',');
+
+                let interpretationText = '';
+                let bgColorClass = '';
+                
+                const formattedAbsEffectSize = absEffectSize.toFixed(2).replace('.', ',');
+
+                if (absEffectSize < 0.35) {
+                    interpretationText = `<strong>Effet Petit.</strong> La différence entre les moyennes est d'environ ${formattedAbsEffectSize} écarts-types. Cela indique une différence faible, potentiellement difficile à observer dans la pratique.`;
+                    bgColorClass = 'bg-blue-500';
+                } else if (absEffectSize < 0.65) {
+                    interpretationText = `<strong>Effet Moyen.</strong> La différence entre les moyennes est d'environ ${formattedAbsEffectSize} écarts-types. C'est une différence perceptible et souvent considérée comme substantielle.`;
+                    bgColorClass = 'bg-yellow-500';
+                } else {
+                    interpretationText = `<strong>Effet Large.</strong> La différence entre les moyennes est d'environ ${formattedAbsEffectSize} écarts-types. Cela représente une différence très marquée et importante entre les deux groupes.`;
+                    bgColorClass = 'bg-red-500';
+                }
+
+                resultDisplay.className = `text-center p-6 rounded-lg text-white transition-colors duration-500 ${bgColorClass}`;
+                interpretationDiv.innerHTML = `<div class="p-4 bg-gray-100 rounded-lg">${interpretationText}</div>`;
+            }
+
+            function standardNormalCdf(x) {
+                // Abramowitz and Stegun approximation for the cumulative distribution function
+                const b1 = 0.319381530;
+                const b2 = -0.356563782;
+                const b3 = 1.781477937;
+                const b4 = -1.821255978;
+                const b5 = 1.330274429;
+                const p = 0.2316419;
+                const c2 = 0.39894228;
+    
+                if (x >= 0.0) {
+                    const t = 1.0 / (1.0 + p * x);
+                    return (1.0 - c2 * Math.exp(-x * x / 2.0) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1));
+                } else {
+                    const t = 1.0 / (1.0 - p * x);
+                    return (c2 * Math.exp(-x * x / 2.0) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1));
+                }
+            }
+            
+            function pdf(x, mean, std) {
+                const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(std, 2));
+                return (1 / (std * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+            }
+
+            function drawGraph(m1, s1, m2, s2) {
+                d3.select("#graph-container").select("svg").remove();
+
+                const container = document.getElementById('graph-container');
+                if (!container || container.clientWidth === 0) return;
+
+                const margin = { top: 20, right: 30, bottom: 40, left: 40 };
+                const width = container.clientWidth - margin.left - margin.right;
+                const height = container.clientHeight - margin.top - margin.bottom;
+
+                const svg = d3.select("#graph-container")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+                
+                const minX = Math.min(m1 - 4 * s1, m2 - 4 * s2);
+                const maxX = Math.max(m1 + 4 * s1, m2 + 4 * s2);
+
+                const x = d3.scaleLinear().domain([minX, maxX]).range([0, width]);
+                
+                const bottomAxis = d3.axisBottom(x)
+                    .ticks(5)
+                    .tickFormat(d => d3.format(".2s")(d).replace('.', ','));
+
+                svg.append("g")
+                   .attr("transform", `translate(0, ${height})`)
+                   .call(bottomAxis);
+
+                const maxY = Math.max(pdf(m1, m1, s1), pdf(m2, m2, s2)) * 1.1;
+                const y = d3.scaleLinear().domain([0, maxY]).range([height, 0]);
+                
+                const points = x.ticks(200);
+                const data1 = points.map(d => ({ x: d, y: pdf(d, m1, s1) }));
+                const data2 = points.map(d => ({ x: d, y: pdf(d, m2, s2) }));
+
+                const line = d3.line().x(d => x(d.x)).y(d => y(d.y)).curve(d3.curveBasis);
+                const area = d3.area().x(d => x(d.x)).y0(height).y1(d => y(d.y)).curve(d3.curveBasis);
+                
+                const overlapData = points.map(d => ({ x: d, y: Math.min(pdf(d, m1, s1), pdf(d, m2, s2)) }));
+                svg.append("path").datum(overlapData).attr("fill", "#a78bfa").attr("d", area);
+
+                svg.append("path").datum(data1).attr("fill", "rgba(59, 130, 246, 0.5)").attr("d", area);
+                svg.append("path").datum(data1).attr("fill", "none").attr("stroke", "#2563eb").attr("stroke-width", 2).attr("d", line);
+
+                svg.append("path").datum(data2).attr("fill", "rgba(22, 163, 74, 0.5)").attr("d", area);
+                svg.append("path").datum(data2).attr("fill", "none").attr("stroke", "#15803d").attr("stroke-width", 2).attr("d", line);
+
+                svg.append("line").attr("x1", x(m1)).attr("y1", y(0)).attr("x2", x(m1)).attr("y2", y(pdf(m1, m1, s1))).attr("stroke", "#2563eb").attr("stroke-width", 2).attr("stroke-dasharray", "4");
+                svg.append("line").attr("x1", x(m2)).attr("y1", y(0)).attr("x2", x(m2)).attr("y2", y(pdf(m2, m2, s2))).attr("stroke", "#15803d").attr("stroke-width", 2).attr("stroke-dasharray", "4");
+            }
+        });
+    </script>
+
+</body>
+</html>
